@@ -73,5 +73,13 @@ Everything above is recomputable from public data **except** the **master seed**
 
 Live in the agent gateway (not vendored here): `pqAgent.ts` (keygen + owner-authorized binding), `pqEpoch.ts` (batch-Merkle epoch anchor), `pqCutoff.ts` (the enforcer), and self-test endpoints `/pq/agent/:r/:id/{enforce,rotation}/selftest`. This repo is the **process + design spec**; the reference impl stays in the live system until a sanitized extraction is ready.
 
+## Acknowledgements
+
+- The per-agent binding lifecycle (keygen · owner-authorized bind · epoch anchor · per-attestation companion · load-bearing cutoff · rotation · revocation) is **Vértice / trustless-ai** design + reference implementation.
+- **Fede (`babyblueviper`)** independently **recompute-verified** the binding — cold, from public data — and the shared **`pq-key-binding-v0`** spec this formalizes landed with him. The recompute-verification is what lets this spec claim "checkable, not asserted" honestly: a second party re-derived it with no shared state.
+- Dual-family and cutoff/rotation/revocation semantics build on the working group's OCP / captured-admission / KYA-L4 lines.
+
+*This is a working-group artifact; contributions credited by the exact thing each party did.*
+
 ---
 *CC0. Extracted 2026-08-04 from Vértice / trustless-ai post-quantum work. To be transferred to `trustless-ai` when the reference extraction lands.*
