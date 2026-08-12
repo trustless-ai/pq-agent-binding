@@ -87,6 +87,16 @@ read. An epoch-0 binding governs `[T0, Trot)`; a rotation at `Trot` governs
 artifact is rejected. Rotation supersedes without erasing — the prior binding is
 preserved, append-only.
 
+> **v0 does not define `T0`.** Implementations supplied it from local state, which
+> makes the boundary verdict-bearing without being commitment-bearing: the same
+> statement, leaf and anchored root can yield a different temporal verdict if that
+> local value changes, and no root recomputation can detect it. Raised by
+> [@pipavlo82](https://github.com/pipavlo82). The fix — derive `governs_from` from
+> the earliest anchor containing the leaf, never store it — is specified in
+> [spec/v1-temporal-authority.md](spec/v1-temporal-authority.md). It changes
+> conformance, so it is a version bump; v0 remains the accurate description of what
+> v0 implementations do, including this defect.
+
 ### Recovery classes — three, and they never relabel
 
 ![Recovery classes](diagrams/04-recovery-classes.png)
