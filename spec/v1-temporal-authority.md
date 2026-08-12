@@ -326,3 +326,84 @@ Anchor the admission head **per batch** (cheap, coarse — a gap surfaces only w
 the next batch lands) or on its **own cadence** (bounded detection time, one extra
 transaction)? The second makes "admitted but not yet covered" observable without
 depending on when someone chooses to cut a batch.
+
+---
+
+## 10. Settled construction
+
+Converged with @pipavlo82 and @babyblueviper1. **R1–R3 are superseded, not amended**
+— this is a different construction, not a corrected one.
+
+```
+acceptance log   append-only, hash-chained
+                 { submission_seq, binding_cc, subject, authorization_cc, prev_acceptance_cc }
+
+authorization    owner-signed:  predecessor_binding_cc -> successor_binding_cc
+                 referenced by cc from the acceptance record, never embedded
+
+manifest         { schema, profile, construction_version,
+                   acceptance_head_cc, covered_through_seq,
+                   min_seq, max_seq, count, entries_root, prev_manifest_cc }
+entries_root     Merkle over H(JCS({submission_seq, binding_cc, subject}))
+anchor           record( sha256(JCS(manifest)) )
+```
+
+**Entries bind the sequence.** With bare `binding_cc` leaves, `min/max/count`
+describe a sequence the root does not commit to — the range would sit *beside* the
+root exactly as `construction_version` did. Caught by @pipavlo82.
+
+**No epoch number in the signed authorization.** Once position derives the epoch, a
+number inside a signed message is a trap: it will be read as authoritative, and if it
+ever disagrees with position there are two sources of truth and a signature endorsing
+one of them. Content addresses name the objects and cannot disagree.
+
+### 10.1 Layers
+
+| layer | question it answers |
+|---|---|
+| position in the acceptance sequence | what order |
+| owner signature | was it authorized |
+| anchored acceptance head | which admissions exist (enumerable domain) |
+| batch manifest | coverage and construction |
+| on-chain anchor | external time |
+| `legacy_bindings_root` | what predates all of it |
+
+Each answers exactly one question, and none is a number a verifier is asked to
+trust. Order and authorization are kept apart for the same reason the companion
+endpoint reports `signature_valid` and `pubkey_bound` separately: a valid signature
+under a key that was never bound is a forgery with a valid signature.
+
+### 10.2 Activation — the genesis manifest IS the cutover
+
+No separate activation record: the boundary and the first object governed by the new
+construction are one immutable fact, rather than two whose ordering needs specifying.
+
+```
+construction_version      = 1
+prev_manifest_cc          = null
+legacy_predecessor_anchor = <last bare-root anchor>
+legacy_bindings_root      = <Merkle over inherited {subject, binding_cc, key_epoch}>
+```
+
+**`legacy_bindings_root` is required**, because bindings that predate the acceptance
+log have no position and are therefore unorderable under this construction. Measured
+on a live deployment at the time of writing: 29 agents with an implicit epoch 0 plus
+2 explicit rows, none with a `submission_seq`.
+
+Backfilling acceptance records for them is **forbidden**: assigning a
+`submission_seq` retroactively to a binding never admitted through the sequence
+manufactures evidence that did not exist — the backdating this construction exists to
+prevent, committed by the mechanism preventing it.
+
+Freezing claims something weaker and true: *this is the state we inherited, committed
+once, at a named moment*. Those epoch numbers are mutable local state today and become
+tamper-evident from the genesis manifest onward.
+
+A binding is governed by this construction if it has an acceptance record, and by the
+frozen legacy set otherwise. Decidable from committed data, with no third state.
+
+### 10.3 Open
+
+Anchor the acceptance head **per batch** or on its **own cadence**? Per batch is
+cheaper, but a gap then surfaces only when a producer next chooses to cut a batch,
+which makes detection time the producer's discretion.
