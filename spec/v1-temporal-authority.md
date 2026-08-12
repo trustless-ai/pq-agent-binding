@@ -262,3 +262,67 @@ be hidden. Pre-manifest anchors need an independently anchored activation bounda
 
 `recompute-kit` #8 is **on hold** until this settles: its vectors model the R1–R5
 shape and exercise neither R6 nor the PENDING/UNRESOLVABLE split.
+
+---
+
+## 9. Agreed construction — admission-relative completeness
+
+Converged with @pipavlo82 and @babyblueviper1. Replaces the direction sketched in
+§8; R1–R3 above are superseded by ordering derived from the acceptance sequence.
+
+```
+acceptance record   { submission_seq, subject, binding_cc, predecessor }
+                    append-only; head anchored INDEPENDENTLY of, and below, the batch
+
+batch manifest      { construction_version, admission_head, covered_through_seq,
+                      min_seq, max_seq, count, bindings_root, previous_manifest }
+anchor              record( sha256(JCS(manifest)) )
+```
+
+Three issues collapse into one construction:
+
+1. **ordering** — per-agent predecessor/successor derived from the committed
+   acceptance sequence. `key_epoch` stops being an input; it is position.
+2. **coverage** — a batch is checked against the anchored admission head, so an
+   omitted admitted binding is a provable sequence gap.
+3. **construction** — the rule that built a root is commitment-bearing, not metadata
+   carried beside it.
+
+`predecessor` is kept even though position implies ordering: position gives the
+sequence, `predecessor` gives the intent, and a disagreement between them is itself
+evidence. It fails loudly rather than silently.
+
+### 9.1 What this proves, and what it does not — normative
+
+The property is **admission-relative completeness**. Stated in full, because the
+adjacent claim is the one that would be wrong:
+
+| claim | provable to | mechanism |
+|---|---|---|
+| no **admitted** binding was omitted from a batch | any third party | seq contiguity of `covered_through_seq` against the anchored admission head |
+| a given binding **was** admitted | the owner | acceptance record at its `submission_seq` under the anchored head |
+| every **request** was admitted | **nobody** | — |
+
+An implementation MUST NOT describe this as completeness over eligible requests. A
+sequence records what was admitted, not what was asked; a producer that never issues
+a `submission_seq` leaves no gap. That is a censorship property, and no internal
+sequencing converts one into the other.
+
+### 9.2 Acceptance acknowledgement (narrows, does not close)
+
+Acceptance SHOULD return `{submission_seq, subject, binding_cc, predecessor}` signed
+by the producer key.
+
+An owner holding an ack whose `submission_seq` is absent from a later head covering
+that range then has a **third-party-provable omission** — the producer attested to
+admitting it. An owner holding no ack knows at request time that they were refused.
+
+This makes refusal loud and contemporaneous rather than silent and retrospective. It
+does not make refusal impossible, and MUST NOT be described as though it does.
+
+### 9.3 Open
+
+Anchor the admission head **per batch** (cheap, coarse — a gap surfaces only when
+the next batch lands) or on its **own cadence** (bounded detection time, one extra
+transaction)? The second makes "admitted but not yet covered" observable without
+depending on when someone chooses to cut a batch.
