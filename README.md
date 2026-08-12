@@ -60,7 +60,8 @@ where it succeeds — the rejection edges are the load-bearing part.
 The classical secp256k1 key binds a post-quantum key across **both** NIST
 families — ML-DSA-65 (FIPS 204, lattice) and SLH-DSA-192s (FIPS 205, hash). Both
 canonicalize under JCS to a byte-compatible content address, anchored via
-`OCP.record()`. The anchoring transaction is sent by the classical key, so the
+[`OCP.record()`](https://github.com/ethereum/ERCs/pull/1788) — the Observation
+Commitment Protocol, ERC-8281 (Damon Zwicker). The anchoring transaction is sent by the classical key, so the
 anchor itself is the proof of possession — not a separate assertion.
 
 ### The migration predicate — how an artifact is admitted
@@ -130,7 +131,10 @@ Everything above is recomputable from public data **except** the **master seed**
 
 - **ERC-8004** — the agent identity a PQ key binds to.
 - **KYA-L4 attestor signature** — the dual-family (ML-DSA + SLH-DSA) production lane.
-- **OCP / anchoring** — epoch roots + statement classes anchored on-chain.
+- **[ERC-8281, the Observation Commitment Protocol](https://github.com/ethereum/ERCs/pull/1788)
+  (Damon Zwicker)** — epoch roots and statement classes are anchored through it. This
+  spec does not re-implement anchoring; it depends on OCP's, and the recompute
+  discipline it is built on.
 - **captured-admission** — the append-only / preserve-the-breach discipline the rotation & revocation rules inherit.
 - **`pq-key-binding-v0`** — the recompute-verified shared spec this formalizes.
 
@@ -160,8 +164,13 @@ Two of those deserve saying out loud, because they are what let this spec claim
   first-class "cannot verify" state, rather than collapsing it into pass or fail,
   is why the migration predicate can fail closed honestly.
 
+**ERC-8281, the Observation Commitment Protocol (Damon Zwicker)** is what this
+anchors through. Damon was not a co-author here, but the epoch anchor and every
+anchored statement class stand on his protocol and its verification invariant —
+so it belongs in the credits, not only in the dependency list.
+
 Dual-family and cutoff/rotation/revocation semantics build on the working
-group's OCP / captured-admission / KYA-L4 lines.
+group's captured-admission and KYA-L4 lines.
 
 *Contributions credited by the exact thing each party did.*
 
