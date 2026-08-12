@@ -1,6 +1,9 @@
 # pq_key_binding — temporal authority (proposed v1)
 
-**Status:** proposed. Changes conformance, so it is a version bump, not an erratum.
+**Status:** **DESIGN FROZEN 2026-08-12**, pending adversarial vectors. Extending the
+design further is closed; the sequence from here is rewrite → attack with vectors →
+implement against the frozen shape. Changes conformance, so it is a version bump, not
+an erratum.
 **Supersedes:** the temporal rule of `pq_key_binding.v0` only. Everything else in
 v0 — statement shape, canonicalisation, content addressing, recovery classes,
 terminality — is unchanged.
@@ -472,18 +475,40 @@ conditions, distinguished by **what evidence establishes them**:
 `ACK_EQUIVOCATION` is the strongest of the three and needs the least: two signatures
 and no chain at all. Raised by @pipavlo82.
 
-**Report the strongest provable fact, not the first that fits.** When a head later
-chooses one side of an equivocation, the losing ack MUST NOT be described merely as
-omitted. Omission is a producer failing to include something; equivocation is a
-producer having already issued mutually incompatible signed admissions. Reporting
-the weaker of two true statements reads as neutrality and is not.
+**Reporting rule — within a class, not across classes.**
+
+> Within the same semantic failure class, report the most specific provable
+> contradiction. Orthogonal liveness facts remain independently reportable.
+
+`ACK_EQUIVOCATION` and `ADMISSION_CONFLICT` are attributable semantic
+contradictions; `ANCHOR_OVERDUE` is a liveness fact and is orthogonal to both. One
+acknowledged admission may therefore correctly report **both** `ACK_EQUIVOCATION`
+(semantic) and `ANCHOR_OVERDUE` (liveness) at once.
+
+So: an equivocation MUST prevent that same semantic failure being softened to
+omission because a head later chose a side — but it MUST NOT suppress an
+independently true timing breach. An earlier draft of this rule totally ordered all
+three, which would have silently hidden a real liveness failure behind a more severe
+finding of a different kind. Caught by @pipavlo82.
 
 ### 10.4.1 The fork shape is constrained away, not named
 
 Two signed acceptance records sharing a `prev_acceptance_cc` and both claiming to be
 the next position is a sibling failure. Rather than give it a state:
 
-> **`submission_seq` MUST equal `seq(prev_acceptance_cc) + 1`.**
+> **`submission_seq` MUST equal `submission_seq(predecessor) + 1`, where the
+> predecessor is FETCHED and RECOMPUTED, never resolved from implementation state.**
+
+A verifier resolves `prev_acceptance_cc` to a published record, recomputes
+`sha256(JCS(record))` and requires it to equal the referenced cc, reads the
+`submission_seq` committed *inside that record*, and only then applies the
+constraint.
+
+If the predecessor cannot be fetched and recomputed, the chain relation is
+**`UNRESOLVED`** — not satisfied, not violated, and above all not assumed. An
+earlier draft wrote this as `seq(prev_acceptance_cc)`, a lookup that in any real
+implementation resolves from local state: the precise defect this constraint exists
+to remove, inside the constraint. Caught by @pipavlo82.
 
 With the chain and the index required to agree by construction, a fork on
 `prev_acceptance_cc` necessarily produces the same `submission_seq`, and therefore
@@ -522,6 +547,8 @@ case must assert the **stronger** label:
 | `anchor-overdue-does-not-invalidate-ack` | deadline passed; the acceptance is still valid evidence |
 | `admission-conflict-committed-position` | head closes `s` to a different `acceptance_cc` |
 | `fork-on-prev-collapses-to-equivocation` | the seq constraint forces the two shapes together |
+| `unresolvable-predecessor-is-not-satisfied` | chain relation `UNRESOLVED` when the predecessor cannot be recomputed |
+| `equivocation-and-overdue-report-together` | orthogonal classes both reported; neither suppresses the other |
 | `naked-cc-signature-rejected` | an ack over an untyped preimage does not verify |
 
 An earlier draft of this table got that wrong — it named an `OMITTED` state on the
