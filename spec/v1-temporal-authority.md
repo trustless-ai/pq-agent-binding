@@ -596,7 +596,13 @@ recompute-kit PR #6). The profile owns only:
    agent keys derive from one seed
 4. **`legacy_bindings_root`** — freezing bindings that predate any sequence
 
-**Limit of this claim:** the table above is a semantic mapping by case name and
-verdict, not a mechanical proof. The proof is to express these vectors in
-`captured-admission.v0`'s shape and run them through the unmodified frozen checker.
-Until that is green, "this is a profile" is a proposal, not a result.
+**PROVEN 2026-08-12.** recompute-kit#9 —
+`conformance/pq-key-binding-v1-profile/`, **9/9 through `admission_check.py`
+unmodified**, core `sha256 7a2369ae…` unchanged and its own 63/63 still reproducing.
+
+Running it corrected the table above: the first attempt crashed on the transition
+shape (`successor_epoch_id` vs `successor_epoch`, `supersede` vs `superseded`). The
+semantic mapping read as agreement while being wrong in its details, and only the
+checker refused it. It also surfaced that `requires_supersede_successor` already
+exists as a profile flag — the owner-signed successor binding designed over several
+rounds was a switch nobody had turned on.
