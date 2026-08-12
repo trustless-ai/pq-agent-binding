@@ -140,11 +140,30 @@ Live in the agent gateway (not vendored here): `pqAgent.ts` (keygen + owner-auth
 
 ## Acknowledgements
 
-- The per-agent binding lifecycle (keygen · owner-authorized bind · epoch anchor · per-attestation companion · load-bearing cutoff · rotation · revocation) is **Vértice / trustless-ai** design + reference implementation.
-- **Fede (`babyblueviper`)** independently **recompute-verified** the binding — cold, from public data — and the shared **`pq-key-binding-v0`** spec this formalizes landed with him. The recompute-verification is what lets this spec claim "checkable, not asserted" honestly: a second party re-derived it with no shared state.
-- Dual-family and cutoff/rotation/revocation semantics build on the working group's OCP / captured-admission / KYA-L4 lines.
+This formalizes **ERC-8373 — Post-Quantum Anchored Key Binding**, co-authored by:
 
-*This is a working-group artifact; contributions credited by the exact thing each party did.*
+- **@TMerlini / vertice.eth** — SLH-DSA attestor lane, live gateway enforcement,
+  per-agent + recovery layers, reference implementation
+- **@babyblueviper1** — ML-DSA implementation + verifier, blind-diffs
+- **@pipavlo82** — failure-class + authority-domain design, conformance vectors
+- **@blockbird** — independent verification, the standing UNVERIFIABLE lane,
+  spec findings, on-chain anchor decode
+
+Discussion: <https://ethereum-magicians.org/t/erc-8373-post-quantum-anchored-key-binding/29225>
+
+Two of those deserve saying out loud, because they are what let this spec claim
+"checkable, not asserted" rather than merely say it:
+
+- The **blind-diffs and independent verification** were done by parties with no
+  shared state — a second and third derivation, not a review of ours.
+- The **standing UNVERIFIABLE lane** is the part most specs omit. Keeping a
+  first-class "cannot verify" state, rather than collapsing it into pass or fail,
+  is why the migration predicate can fail closed honestly.
+
+Dual-family and cutoff/rotation/revocation semantics build on the working
+group's OCP / captured-admission / KYA-L4 lines.
+
+*Contributions credited by the exact thing each party did.*
 
 ---
 *CC0. Extracted 2026-08-04 from Vértice / trustless-ai post-quantum work.*
