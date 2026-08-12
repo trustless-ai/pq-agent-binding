@@ -88,9 +88,53 @@ For a binding `B` of agent `A` at `key_epoch n`, with leaf
 **R2 — successors.** For `n > 0`, `governs_from(B)` is the anchor timestamp of the
 **earliest** anchored batch whose root contains `cc`.
 
-**R3 — fail closed.** If `n > 0` and no anchored batch contains `cc`, `B` has no
-`governs_from` and is **never in force**. A binding that cannot be proven cannot
-govern.
+**R3 — no containing anchor, split into two states.** If `n > 0` and no anchored
+batch contains `cc`, `B` has no `governs_from` and does not govern. But *why* it
+has none matters, and the first draft of this rule collapsed two different
+situations into one verdict:
+
+- **`PENDING`** — no batch has yet included it. It may still resolve. Derived: no
+  binding of the same agent at `key_epoch > n` has a containing anchor.
+- **`UNRESOLVABLE`** — it was **skipped** and never can resolve. Derived: some
+  binding of the same agent at `key_epoch > n` **does** have a containing anchor,
+  so a batch ran after `B` existed and did not include it.
+
+Both refuse to govern, so neither admits an artifact. They are distinguished
+because they mean different things to a reader: one is "wait", the other is
+"this can never be proven, and anything signed under it is permanently
+unverifiable". Reporting a permanent loss as a pending state is the same defect
+this document exists to remove, one layer up.
+
+The distinction is derived from anchors and epoch ordering alone. It deliberately
+does **not** consult `submitted_at`, which would violate R5.
+
+**R6 — batch completeness (the actual fix).** An anchored batch MUST contain a leaf
+for **every binding not already contained in some earlier anchor**, not merely each
+agent's current binding.
+
+> Found by [@babyblueviper1](https://github.com/babyblueviper1), who checked the
+> live batches instead of assuming: the leaf set is one leaf per
+> `(registry, agent_id)` — 29 leaves, 29 distinct pairs, no agent twice — i.e. the
+> *current* key at anchor time, not a rotation history.
+>
+> So an agent that rotates **twice between batches** — `N` submitted, then `N+1`
+> submitted before the next batch fires — leaves `N` in no anchor, ever. Any
+> companion genuinely signed under `N` during its brief life has no provable
+> governance window, structurally and permanently. And fast double rotation is not
+> exotic: it is what you do when a replacement key is itself suspect.
+
+R6 removes the failure mode rather than defining a state for it. Cost is a few
+extra leaves in one Merkle root and the same single transaction.
+
+`UNRESOLVABLE` under R3 therefore remains reachable only for **legacy data
+anchored before R6** and for **non-conforming implementations**. A defined state
+for a loss that should no longer occur is a diagnosis, not a design.
+
+**Rejected alternative:** forbidding a rotation while an earlier one is unanchored
+(queueing it until the pending batch fires). That couples an owner's ability to
+recover to the operator's batching cadence, and blocks the emergency case —
+replacing a key twice quickly — at exactly the moment it is needed. Recovery must
+not wait on a schedule.
 
 **R4 — resolution is otherwise unchanged from v0.** Among bindings with
 `governs_from ≤ anchor_time(artifact)` and not revoked at or before it, the one
@@ -127,6 +171,9 @@ To be added to `recompute-kit/conformance/pq-key-binding-v1/`:
 | `unanchored-successor-never-in-force` | R3 — fails closed |
 | `submitted-at-is-not-verdict-bearing` | R5 — mutating `submitted_at` changes no verdict |
 | `earliest-not-latest-containing-anchor` | R2 — re-anchoring the same leaf later does not move the boundary |
+| `skipped-epoch-is-unresolvable` | R3 — an epoch superseded before any batch is UNRESOLVABLE, not PENDING |
+| `unanchored-latest-epoch-is-pending` | R3 — the newest epoch with no batch yet is PENDING, distinct from the above |
+| `batch-includes-every-unanchored-binding` | R6 — a conforming batch contains skipped epochs, so the state cannot arise |
 
 The last two are the ones that would have caught the defect. A vector suite that
 only checks agreement between implementations cannot find a value that every
@@ -142,10 +189,22 @@ tests the *shape* of the dependency rather than its value.
 3. v0 verdicts and v1 verdicts differ only within §4's window. Implementations
    SHOULD report which version produced a verdict.
 
-## 7. Open question
+## 7. Open questions
 
-R2 uses the **earliest** containing anchor. If a leaf is re-anchored in a later
-batch — routine, since batches include every current binding — the boundary must
-not move forward. Stated explicitly because "the anchor containing it" is ambiguous
-once a leaf appears in several, and the ambiguity is exactly the kind that reads as
-settled until two implementations disagree.
+**Answered.** R2 uses the **earliest** containing anchor: a leaf re-anchored in a
+later batch must not move the boundary forward. Routine, since batches re-include
+current bindings, and ambiguous the moment a leaf appears in several.
+
+**Answered by R6.** The skipped-epoch case — an epoch superseded before any batch
+ran — was raised by @babyblueviper1 against the first draft, where R3 silently
+covered both "not yet anchored" and "can never be anchored". R6 makes it
+structurally impossible; R3 now names the two states apart for data anchored
+before R6.
+
+**Still open.** R6 changes what a batch contains, so a verifier recomputing an
+OLD root must use the pre-R6 construction (one leaf per agent) and a new root the
+post-R6 one. Roots are not self-describing about which rule built them. Options:
+carry a construction version alongside the root, or accept that pre-R6 roots are
+only recomputable against the pre-R6 rule and say so normatively. Leaning to the
+former — a root whose construction must be inferred is a root that will eventually
+be recomputed wrong.
