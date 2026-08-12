@@ -143,7 +143,8 @@ the artifact is rejected.
 
 **R5 — independence.** A conforming verifier MUST compute R1–R4 from published
 leaves and anchor timestamps alone. No implementation-held value may appear in the
-verdict path.
+verdict path. (R6 binds the *producer* of a batch, not the verifier — a verifier
+cannot enforce it, only observe that a skipped epoch is UNRESOLVABLE under R3.)
 
 ## 4. What changes in practice
 
