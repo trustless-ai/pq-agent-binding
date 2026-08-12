@@ -209,3 +209,56 @@ carry a construction version alongside the root, or accept that pre-R6 roots are
 only recomputable against the pre-R6 rule and say so normatively. Leaning to the
 former — a root whose construction must be inferred is a root that will eventually
 be recomputed wrong.
+
+---
+
+## 8. UNRESOLVED — three ways this is still implementation-state-dependent
+
+Raised by @pipavlo82 after R6, and they invalidate parts of the rules above rather
+than merely extending them. **R1–R3 should not be treated as settled.**
+
+**8.1 `key_epoch` is itself a trusted input.** R1/R2/R3 branch on `n`, but the
+statement commits to `schema, subject, pq_pubkey, algorithm, profile,
+secp256k1_pubkey` — **no `key_epoch`**. A verifier cannot tell a baseline from a
+successor. The original failure shape survives one level lower: the same leaf can
+be classified either way and receive a different `governs_from`.
+
+Worse, the evidence that would order the chain already exists and is destroyed.
+`rotationMessage` is owner-signed over `registry, agent_id, next_epoch,
+next_pubkey, issued_at`; `submitRotation` verifies it and inserts a row with no
+signature column.
+
+**8.2 R6 has no enumerable domain.** A root proves membership of leaves it
+contains; it cannot prove that an omitted binding existed, if that binding is
+visible only in implementation state. As written R6 is a producer requirement, not
+a third-party-recomputable completeness property.
+
+**8.3 `construction_version` must be bound, not carried.** Metadata beside a root
+leaves the same root interpretable under either construction.
+
+### Direction under discussion
+
+@babyblueviper1's `enumerate-verify` shape from `trustless-agent-substrate` #1,
+transplanted: a committed gateway-wide monotonic `submission_seq` per binding, with
+each batch committing `{min_seq, max_seq, count}`. Contiguity of the union is then
+checkable, and a gap is a *provable* omission.
+
+It also answers 8.1, which is the part worth noting: with a committed sequence,
+**`key_epoch` is derived from position** — the k-th binding of an agent in sequence
+order is its epoch k. Ordering stops being a number to trust. That is stronger than
+binding `key_epoch` into the statement, which only makes the number tamper-evident.
+
+One gap in that scheme as stated: a withheld *manifest* is indistinguishable from a
+gap, so enumerating bindings requires first enumerating batches. Proposed
+resolution — anchor a manifest commitment rather than a bare root:
+
+```
+manifest = { construction_version, seq_range{min,max}, count, leaves_root, prev_manifest_cc }
+anchor   = record( sha256(JCS(manifest)) )
+```
+
+which binds the construction (8.3), the domain (8.2), and chains batches so none can
+be hidden. Pre-manifest anchors need an independently anchored activation boundary.
+
+`recompute-kit` #8 is **on hold** until this settles: its vectors model the R1–R5
+shape and exercise neither R6 nor the PENDING/UNRESOLVABLE split.
