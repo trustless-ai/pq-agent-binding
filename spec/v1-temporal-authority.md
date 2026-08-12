@@ -556,3 +556,47 @@ weaker condition, one section after §9.1 states that "we cannot see it" and "it
 provably is not there" are different claims and the first must never be reported as
 the second. Recorded rather than silently corrected, because writing the principle
 down plainly did not prevent violating it in the next table.
+
+---
+
+## 11. This is a PROFILE, not a new mechanism
+
+Diffed against the frozen `captured-admission.v0` core (verified on `main`:
+**63/63**, checker `sha256 7a2369ae…`, matching the freeze at `a724afc`).
+
+Every structural property §10.4 converged on already exists there, blind-diffed by
+@pipavlo82 and @babyblueviper1:
+
+| §10 property | frozen case → verdict |
+|---|---|
+| claim before the boundary has no authority | `authority_claim_before_activation_out_of_authority` → `out_of_authority` |
+| rotation / revocation non-retroactive | `..._after_supersede_nonretroactive`, `NC2b_..._after_revoke_nonretroactive` → `attributed` |
+| a successor must be bound | `AUTH_supersede_without_bound_successor_invalid` → `invalid_transition` |
+| PENDING | `AUTH_as_of_before_activation_epoch_not_yet_active` → `epoch_not_yet_active` |
+| not-yet-visible ≠ omitted | `AUTH_future_claim_not_visible_at_earlier_asof` → `claim_not_yet_visible` |
+| `ADMISSION_CONFLICT` / `ACK_EQUIVOCATION` | `ENUM_conflicting_commitments_same_index` → `conflicting_index` |
+| gaps / duplicates / ordering / head≠anchor | `ENUM_gap_missing_index`, `ENUM_duplicate_index_same_commitment`, `ENUM_out_of_order_entries`, `ENUM_commitment_mismatch_head_ne_anchor` |
+| `ANCHOR_OVERDUE` is liveness, not invalidity | `NC1_obligation_overdue_is_liveness_not_rejected` → `unresolved\|liveness_failure` |
+| breach survives late closure | `NC5_late_resolution_preserves_deadline_breach` → `late` |
+
+**The core takes an activation boundary as INPUT and proves the state machine over
+it. It never says where that boundary comes from — which is the question this
+document was actually about.** The machinery was always correct; our input was
+implementation state.
+
+So `pq_key_binding.v1` is a **profile** over the frozen core, reusing
+`admission_check.py` unmodified (the pattern @babyblueviper1 established in
+recompute-kit PR #6). The profile owns only:
+
+1. **derivation of activation** — `governs_from` from the earliest containing anchor;
+   `0` for a baseline
+2. **the owner-signed transition** — `predecessor_binding_cc → successor_binding_cc`,
+   domain-separated, persisted
+3. **`seed_epoch`** — the master-seed axis the core has no notion of, because all
+   agent keys derive from one seed
+4. **`legacy_bindings_root`** — freezing bindings that predate any sequence
+
+**Limit of this claim:** the table above is a semantic mapping by case name and
+verdict, not a mechanical proof. The proof is to express these vectors in
+`captured-admission.v0`'s shape and run them through the unmodified frozen checker.
+Until that is green, "this is a profile" is a proposal, not a result.
