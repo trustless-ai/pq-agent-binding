@@ -402,8 +402,59 @@ tamper-evident from the genesis manifest onward.
 A binding is governed by this construction if it has an acceptance record, and by the
 frozen legacy set otherwise. Decidable from committed data, with no third state.
 
-### 10.3 Open
+### 10.3 Admission-head cadence — bounded, and measured between anchors
 
-Anchor the acceptance head **per batch** or on its **own cadence**? Per batch is
-cheaper, but a gap then surfaces only when a producer next chooses to cut a batch,
-which makes detection time the producer's discretion.
+Per-batch-only couples observability back to batching: an admitted binding can stay
+globally invisible for an unbounded period if no batch is cut. So (@pipavlo82):
+anchor the head **whenever a batch lands, OR no later than a profile-bounded Δ,
+whichever is first.** No extra transaction when batching is timely; a bounded
+lifetime for "admitted but not externally closed" when batching stalls.
+
+**Δ MUST be measured between anchored heads, never from acceptance.** Acceptance
+time is producer-held until anchored, so a Δ starting there has an endpoint no third
+party can witness — the bound would rest on exactly the kind of implementation-held
+value this document exists to remove, inside the mechanism meant to guarantee
+timeliness. A bound whose start only one party can see is not a bound.
+
+To make an admission locatable in externally-timed space, the acceptance record
+carries the head most recently anchored when it was accepted:
+
+```
+acceptance_record = { schema, submission_seq, subject, binding_cc,
+                      predecessor_binding_cc, authorization_cc,
+                      observed_head_cc, prev_acceptance_cc }
+acceptance_cc     = sha256(JCS(acceptance_record))
+ack               = producer_signature(acceptance_cc)
+```
+
+The ack signs `acceptance_cc` — the **whole** record, not a chosen subset — so the
+owner holds evidence of the exact object that must appear under a later head,
+including its authorization link and chain position. (An earlier draft signed only
+four fields, which is the same defect as a manifest describing a sequence its root
+does not commit to.)
+
+A third party can then decide, from committed data alone: an admission was made
+after `H_n`; `H_{n+1}` anchored at `T`; if the head advanced and
+`T − anchor_time(H_n) > Δ`, the profile bound was breached — provable rather than
+alleged. If `H_{n+1}` covers the range and the record is absent, that is a provable
+omission, and the owner's ack proves the producer attested to admitting it.
+
+Δ is profile-level and MUST be stated explicitly wherever bounded observability is
+claimed.
+
+### 10.4 State progression
+
+| state | what is true | visible to |
+|---|---|---|
+| `REQUESTED` | no admission claim exists | requester only |
+| `ACKNOWLEDGED` | owner holds a signed `acceptance_cc`, not yet under any anchored head | owner |
+| `ADMITTED` | `acceptance_cc` appears under an anchored head; ordering derivable | anyone |
+| `COVERED` | the binding appears in an anchored manifest's `entries_root`; `governs_from` derivable | anyone |
+| `OMITTED` | a head covers the seq range and the record is absent | anyone holding the ack |
+
+`OMITTED` is a named terminal state rather than an absence, because "we cannot see
+it" and "it provably is not there" are different claims and the first must never be
+reported as the second.
+
+*(Provisional — reconstructed from a truncated message and pending @pipavlo82's
+version.)*
