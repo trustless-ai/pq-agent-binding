@@ -147,4 +147,10 @@ Live in the agent gateway (not vendored here): `pqAgent.ts` (keygen + owner-auth
 *This is a working-group artifact; contributions credited by the exact thing each party did.*
 
 ---
-*CC0. Extracted 2026-08-04 from Vértice / trustless-ai post-quantum work. To be transferred to `trustless-ai` when the reference extraction lands.*
+*CC0. Extracted 2026-08-04 from Vértice / trustless-ai post-quantum work.*
+
+*Maintained here in `trustless-ai` as a working-group artifact. The design and
+reference implementation are **Vértice Criativo's contribution** to the group;
+`verticecriativo/pq-agent-binding` is a fork of this repository, not a rival
+copy — this one is canonical. Transferred 2026-08-12, which is what the previous
+footer said would happen.*
