@@ -460,17 +460,69 @@ indistinguishable, and neither is provable.
 | `ADMISSION_ANCHORED` | the exact `acceptance_cc` appears at its committed `submission_seq` under an anchored head. Ordering is third-party derivable | anyone |
 | `COVERED` | the binding entry appears in an anchored batch manifest; `governs_from` derivable | anyone |
 
-Separately, and deliberately not mixed into the above:
+Separately, and deliberately not mixed into the above — three positive-failure
+conditions, distinguished by **what evidence establishes them**:
 
-| condition | what it is | who can establish it |
+| condition | what it is | establishable by |
 |---|---|---|
-| `ANCHOR_OVERDUE` | the ack deadline passed without a successor head closing the range. **A timing fact, not a statement that the signed acceptance became invalid** | holder; any third party shown the ack |
-| `ADMISSION_CONFLICT` | a later anchored head claims to cover `submission_seq = s`, but the committed entry at `s` is not the acknowledged `acceptance_cc`. Absence has become a positive contradiction | anyone holding the ack |
+| `ACK_EQUIVOCATION` | two valid producer-signed acks make incompatible claims about the same `submission_seq` (different `acceptance_cc`). The producer contradicted itself **before any external closure** | anyone shown both acks — **no anchor required** |
+| `ANCHOR_OVERDUE` | the ack deadline passed without a successor head closing the range. A timing fact; **the signed acceptance remains valid evidence** | holder; any third party shown the ack |
+| `ADMISSION_CONFLICT` | a later anchored head closes position `s` to something incompatible with the acknowledged `acceptance_cc`. Absence has become a positive contradiction | anyone shown the ack, plus the chain |
 
-**A record is NOT omitted merely because an endpoint does not return it, or because
-no later head has appeared.** Until a commitment closes the range that is
-*unavailable* or *pending*. Omission is provable only once the range is committed
-and the acknowledged object is not what occupies its sequence position.
+`ACK_EQUIVOCATION` is the strongest of the three and needs the least: two signatures
+and no chain at all. Raised by @pipavlo82.
+
+**Report the strongest provable fact, not the first that fits.** When a head later
+chooses one side of an equivocation, the losing ack MUST NOT be described merely as
+omitted. Omission is a producer failing to include something; equivocation is a
+producer having already issued mutually incompatible signed admissions. Reporting
+the weaker of two true statements reads as neutrality and is not.
+
+### 10.4.1 The fork shape is constrained away, not named
+
+Two signed acceptance records sharing a `prev_acceptance_cc` and both claiming to be
+the next position is a sibling failure. Rather than give it a state:
+
+> **`submission_seq` MUST equal `seq(prev_acceptance_cc) + 1`.**
+
+With the chain and the index required to agree by construction, a fork on
+`prev_acceptance_cc` necessarily produces the same `submission_seq`, and therefore
+collapses into `ACK_EQUIVOCATION`. A record violating the constraint is malformed
+and rejectable on sight rather than being a fourth failure mode. Same instinct as
+R6: remove the degree of freedom instead of naming what happens when it is abused.
+
+### 10.4.2 Domain separation
+
+The producer signature MUST NOT be over a naked `acceptance_cc`. Both halves:
+
+```
+acceptance_record = { schema: "kya.pq_acceptance.v1", profile, producer_key, chain_id,
+                      submission_seq, subject, binding_cc, predecessor_binding_cc,
+                      authorization_cc, observed_head_cc, prev_acceptance_cc }
+acceptance_cc     = sha256(JCS(acceptance_record))
+ack               = producer_signature( sha256(JCS({ type: "kya.acceptance_ack.v1",
+                                                     acceptance_cc })) )
+```
+
+`profile`, `producer_key` and `chain_id` inside the record so **`acceptance_cc`
+itself** cannot recur in another deployment — domain-separating only the signature
+would still let the same content address appear in someone else's log. The typed
+preimage on top so an ack signature cannot be replayed as a different object type
+signed by the same producer key.
+
+### 10.4.3 Required negative vectors
+
+All three positive-failure conditions get explicit vectors, and the equivocation
+case must assert the **stronger** label:
+
+| vector | asserts |
+|---|---|
+| `ack-equivocation-two-signed-acks` | same `submission_seq`, different `acceptance_cc`, no anchor needed |
+| `ack-equivocation-survives-head-choice` | after a head picks a side, the loser reports equivocation, NOT omission |
+| `anchor-overdue-does-not-invalidate-ack` | deadline passed; the acceptance is still valid evidence |
+| `admission-conflict-committed-position` | head closes `s` to a different `acceptance_cc` |
+| `fork-on-prev-collapses-to-equivocation` | the seq constraint forces the two shapes together |
+| `naked-cc-signature-rejected` | an ack over an untyped preimage does not verify |
 
 An earlier draft of this table got that wrong — it named an `OMITTED` state on the
 weaker condition, one section after §9.1 states that "we cannot see it" and "it
