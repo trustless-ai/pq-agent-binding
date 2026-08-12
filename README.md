@@ -142,7 +142,11 @@ Everything above is recomputable from public data **except** the **master seed**
 
 **The normative reference is the conformance suite, not any one codebase.**
 
-[`trustless-ai/recompute-kit` → `conformance/pq-key-binding-v0/`](https://github.com/trustless-ai/recompute-kit/tree/main/conformance/pq-key-binding-v0)
+[`trustless-ai/recompute-kit` @ `pq-key-binding-v0`](https://github.com/trustless-ai/recompute-kit/tree/pq-key-binding-v0/conformance/pq-key-binding-v0)
+
+**Pinned to a tag, not a branch.** A verdict that points at a moving HEAD stops
+meaning anything the moment the ref moves — what was checked becomes unknowable.
+The tag is the immutable recompute target; this spec references it, not `main`.
 
 | | |
 |---|---|
@@ -175,6 +179,25 @@ epoch anchor), `pqCutoff.ts` (the enforcer), and the
 agent gateway. That repository is **private** — it is a production service, not a
 reference — and it is *an* implementation of this profile rather than the
 definition of it. Conformance is decided by the suite above, which anyone can run.
+
+## Independent verifications
+
+Records of second reads, kept as method rather than testimony — each one
+re-derivable from public data by anyone, without trusting the verifier or us.
+
+| date | verifier | result |
+|---|---|---|
+| 2026-08-12 | babyblueviper1 (Fede), invinoveritas | [both lanes match, cold](verifications/2026-08-12-babyblueviper1.md) |
+
+The 2026-08-12 read established the property the dual-family design rests on:
+the statement names a classical key, the anchoring transaction was sent by that
+key, so **sender-of-record is the proof-of-possession** — a chain fact, not an
+assertion. Verified against a public RPC, not this project's gateway.
+
+Deliberately excluded as evidence: the gateway's own `/pq/**/selftest`
+endpoints. A service grading its own output is zero distance from the thing being
+checked, however real the underlying binding. Useful as a smoke test, not a
+verification.
 
 ## Acknowledgements
 
