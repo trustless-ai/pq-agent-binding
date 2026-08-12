@@ -48,6 +48,71 @@ The mode + cutoff are themselves anchored statements; the decision is recomputab
 
 **7. Revocation.** An **anchored statement class** + a **temporal rule**: a revocation is its own anchored record; an attestation signed after the revocation's in-force time by the revoked key does not verify. The breach is **preserved, never rewritten** (a late/overturned outcome keeps its record — same discipline as captured-admission).
 
+## Diagrams
+
+Five decision paths, each showing where a claim is **rejected** rather than only
+where it succeeds — the rejection edges are the load-bearing part.
+
+### Dual family — what gets bound, and what proves possession
+
+![Dual-family binding](diagrams/02-dual-family-binding.png)
+
+The classical secp256k1 key binds a post-quantum key across **both** NIST
+families — ML-DSA-65 (FIPS 204, lattice) and SLH-DSA-192s (FIPS 205, hash). Both
+canonicalize under JCS to a byte-compatible content address, anchored via
+`OCP.record()`. The anchoring transaction is sent by the classical key, so the
+anchor itself is the proof of possession — not a separate assertion.
+
+### The migration predicate — how an artifact is admitted
+
+![Migration predicate](diagrams/01-migration-predicate.png)
+
+Two ways to be admitted, one way to fail:
+
+- **`anchored_before_cutoff`** — proven anchored before cutoff T. The back
+  catalogue is *never* retroactively rejected.
+- **`valid_pq_companion`** — a valid companion under the binding in force **at
+  the artifact's anchor time**, not at verification time.
+- **`post_cutoff_no_valid_companion`** — rejected. Omitting the companion **fails
+  closed**; a missing signature is not a passing check.
+
+### In-force at anchor time
+
+![In-force at anchor time](diagrams/03-inforce-anchor-time.png)
+
+Which key governs depends on *when the artifact was anchored*, not when it is
+read. An epoch-0 binding governs `[T0, Trot)`; a rotation at `Trot` governs
+`[Trot, Trev)`; after a revocation at `Trev` there is **no in-force key** and the
+artifact is rejected. Rotation supersedes without erasing — the prior binding is
+preserved, append-only.
+
+### Recovery classes — three, and they never relabel
+
+![Recovery classes](diagrams/04-recovery-classes.png)
+
+An authority-transition record resolves to exactly one class:
+
+| Class | Meaning | Authority |
+|---|---|---|
+| `rotation` | continuity — names a successor in force | per-agent, SIWE |
+| `agent_terminal` | terminated — no key in force after | per-agent, SIWE |
+| `seed_epoch_rotation` | systemic recovery — keys derive from `S'` | fleet, deployer-tx |
+
+If a class's predicate fails, the record is **rejected** — never quietly
+relabelled as a weaker class it does satisfy. That is the whole discipline: a
+failed rotation does not become a "termination", it fails.
+
+### Terminality — a compromised key cannot resurrect itself
+
+![Terminality bind gate](diagrams/05-terminality-bind-gate.png)
+
+A new binding is admitted only if no unlifted terminal covers the agent.
+`terminal_owner` is **absolute** — retirement is never liftable.
+`terminal_incident` is liftable *only* by a valid fleet `seed_epoch_rotation`
+covering that agent: recovery has to be re-keyed from outside. The per-agent path
+cannot lift it, because a compromised key authorising its own recovery is exactly
+the attack.
+
 ## The one deliberate secret
 
 Everything above is recomputable from public data **except** the **master seed** — the root from which per-agent keys derive. That is the *point*: it is the single standing secret, held **offline / encrypted-at-rest** (no plaintext env, no HSM required for the free tier), with a public **fingerprint** so its identity is checkable without exposing it. Back it up — it is the only copy.
