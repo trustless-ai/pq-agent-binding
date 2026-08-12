@@ -402,22 +402,33 @@ tamper-evident from the genesis manifest onward.
 A binding is governed by this construction if it has an acceptance record, and by the
 frozen legacy set otherwise. Decidable from committed data, with no third state.
 
-### 10.3 Admission-head cadence — bounded, and measured between anchors
+### 10.3 Admission-head cadence — a deadline inherited from a witnessed head
 
-Per-batch-only couples observability back to batching: an admitted binding can stay
-globally invisible for an unbounded period if no batch is cut. So (@pipavlo82):
-anchor the head **whenever a batch lands, OR no later than a profile-bounded Δ,
-whichever is first.** No extra transaction when batching is timely; a bounded
-lifetime for "admitted but not externally closed" when batching stalls.
+Per-batch-only couples observability to batching: an admitted binding can stay
+globally invisible for an unbounded period if no batch is cut.
 
-**Δ MUST be measured between anchored heads, never from acceptance.** Acceptance
-time is producer-held until anchored, so a Δ starting there has an endpoint no third
-party can witness — the bound would rest on exactly the kind of implementation-held
-value this document exists to remove, inside the mechanism meant to guarantee
-timeliness. A bound whose start only one party can see is not a bound.
+`observed_head_cc` — the head most recently anchored when the record was accepted —
+goes in the acceptance record. Its job is narrow and it must not be widened:
 
-To make an admission locatable in externally-timed space, the acceptance record
-carries the head most recently anchored when it was accepted:
+> **It proves the admission happened AFTER that head. It is not an acceptance
+> timestamp.** An externally witnessed causal lower bound, nothing more.
+
+From that, the deadline is derived rather than asserted (@pipavlo82):
+
+```
+ack_deadline = anchor_time(observed_head_cc) + Δ
+```
+
+Fully recomputable by a third party. A producer may issue an ack late within the
+interval, but then inherits a correspondingly short remaining window; if the latest
+head is too stale for that to be practical, it anchors a fresh head first and acks
+against that.
+
+This is why the bound is phrased as **closure from the referenced anchored head**,
+not "Δ from acceptance". A bound from acceptance needs an independently witnessed
+acceptance time, which does not exist. It also avoids requiring empty heartbeat
+transactions while idle: a fresh head is needed only before accepting against a
+stale observation point, not on a timer.
 
 ```
 acceptance_record = { schema, submission_seq, subject, binding_cc,
@@ -427,34 +438,42 @@ acceptance_cc     = sha256(JCS(acceptance_record))
 ack               = producer_signature(acceptance_cc)
 ```
 
-The ack signs `acceptance_cc` — the **whole** record, not a chosen subset — so the
-owner holds evidence of the exact object that must appear under a later head,
-including its authorization link and chain position. (An earlier draft signed only
-four fields, which is the same defect as a manifest describing a sequence its root
-does not commit to.)
+The ack signs the **whole** record, so the holder has evidence of the exact object
+that must appear under a later head, including its authorization link and chain
+position.
 
-A third party can then decide, from committed data alone: an admission was made
-after `H_n`; `H_{n+1}` anchored at `T`; if the head advanced and
-`T − anchor_time(H_n) > Δ`, the profile bound was breached — provable rather than
-alleged. If `H_{n+1}` covers the range and the record is absent, that is a provable
-omission, and the owner's ack proves the producer attested to admitting it.
+### 10.3.1 The admission head needs indexed sequence semantics
 
-Δ is profile-level and MUST be stated explicitly wherever bounded observability is
-claimed.
+A bag root proves membership; it cannot prove **what occupies position s**. Since
+the failure states below turn on "the entry at `submission_seq = s` is not the
+acknowledged `acceptance_cc`", the head MUST commit to an ordered construction —
+Merkle over `H(JCS({submission_seq, acceptance_cc}))` — plus the committed
+contiguous range. Without position, an omission and a reordering are
+indistinguishable, and neither is provable.
 
-### 10.4 State progression
+### 10.4 State progression — semantic state, with liveness kept separate
 
-| state | what is true | visible to |
+| state | what is true | who can establish it |
 |---|---|---|
-| `REQUESTED` | no admission claim exists | requester only |
-| `ACKNOWLEDGED` | owner holds a signed `acceptance_cc`, not yet under any anchored head | owner |
-| `ADMITTED` | `acceptance_cc` appears under an anchored head; ordering derivable | anyone |
-| `COVERED` | the binding appears in an anchored manifest's `entries_root`; `governs_from` derivable | anyone |
-| `OMITTED` | a head covers the seq range and the record is absent | anyone holding the ack |
+| `REQUESTED` | **outside the normative machine.** Requester-local; no public admission fact exists | requester only |
+| `ACKNOWLEDGED` | holder has `producer_signature(acceptance_cc)`. Cryptographically attributable, not yet under an external head. Closure deadline is mechanically `anchor_time(observed_head_cc) + Δ` | holder |
+| `ADMISSION_ANCHORED` | the exact `acceptance_cc` appears at its committed `submission_seq` under an anchored head. Ordering is third-party derivable | anyone |
+| `COVERED` | the binding entry appears in an anchored batch manifest; `governs_from` derivable | anyone |
 
-`OMITTED` is a named terminal state rather than an absence, because "we cannot see
-it" and "it provably is not there" are different claims and the first must never be
-reported as the second.
+Separately, and deliberately not mixed into the above:
 
-*(Provisional — reconstructed from a truncated message and pending @pipavlo82's
-version.)*
+| condition | what it is | who can establish it |
+|---|---|---|
+| `ANCHOR_OVERDUE` | the ack deadline passed without a successor head closing the range. **A timing fact, not a statement that the signed acceptance became invalid** | holder; any third party shown the ack |
+| `ADMISSION_CONFLICT` | a later anchored head claims to cover `submission_seq = s`, but the committed entry at `s` is not the acknowledged `acceptance_cc`. Absence has become a positive contradiction | anyone holding the ack |
+
+**A record is NOT omitted merely because an endpoint does not return it, or because
+no later head has appeared.** Until a commitment closes the range that is
+*unavailable* or *pending*. Omission is provable only once the range is committed
+and the acknowledged object is not what occupies its sequence position.
+
+An earlier draft of this table got that wrong — it named an `OMITTED` state on the
+weaker condition, one section after §9.1 states that "we cannot see it" and "it
+provably is not there" are different claims and the first must never be reported as
+the second. Recorded rather than silently corrected, because writing the principle
+down plainly did not prevent violating it in the next table.
