@@ -4,7 +4,7 @@
 
 > **Don't trust. Recompute.** — including the migration off Shor-vulnerable signatures.
 
-**Status:** reference spec extracted from a live, shipped implementation (2026-07/08). Intended home: the `trustless-ai` org, once polished. Companion to the recompute-verified `pq-key-binding-v0` shared spec.
+**Status:** reference spec extracted from a live, shipped implementation (2026-07/08). Home: this repo, in the `trustless-ai` org — arrived 2026-08-12. Companion to the recompute-verified `pq-key-binding-v0` shared spec.
 
 ---
 
@@ -138,9 +138,43 @@ Everything above is recomputable from public data **except** the **master seed**
 - **captured-admission** — the append-only / preserve-the-breach discipline the rotation & revocation rules inherit.
 - **`pq-key-binding-v0`** — the recompute-verified shared spec this formalizes.
 
-## Reference implementation
+## Reference
 
-Live in the agent gateway (not vendored here): `pqAgent.ts` (keygen + owner-authorized binding), `pqEpoch.ts` (batch-Merkle epoch anchor), `pqCutoff.ts` (the enforcer), and self-test endpoints `/pq/agent/:r/:id/{enforce,rotation}/selftest`. This repo is the **process + design spec**; the reference impl stays in the live system until a sanitized extraction is ready.
+**The normative reference is the conformance suite, not any one codebase.**
+
+[`trustless-ai/recompute-kit` → `conformance/pq-key-binding-v0/`](https://github.com/trustless-ai/recompute-kit/tree/main/conformance/pq-key-binding-v0)
+
+| | |
+|---|---|
+| `pq-key-binding-v0.spec.md` | the shared cross-implementation profile |
+| `gate.py` | recomputes the binding's self-verifying content address (hash-only lane) |
+| `cutoff_enforce.py` | the cutoff decision |
+| `*.vectors.json` | rotation · revocation · cutoff · per-agent-anchor |
+
+Vectors define conformance; code only demonstrates it. Point an implementation at
+the suite and you get an answer that does not depend on trusting either of us —
+which is the whole claim this spec makes about itself.
+
+### Two implementations already conform
+
+The profile converged in the working group on 2026-07-30, and **two independent
+implementations bind identically** under it:
+
+- **invinoveritas** — Nostr verdicts, OTS → Bitcoin anchor
+- **the KYA-L4 attestor** — gateway EIP-712, OCP → chain anchor
+
+Different chains, different anchoring, different signature stacks, same binding.
+That agreement is the reference — a second implementation reaching the same
+content address is worth more than any amount of our own code being readable.
+
+### The implementation this spec was extracted from
+
+`pqAgent.ts` (keygen + owner-authorized binding), `pqEpoch.ts` (batch-Merkle
+epoch anchor), `pqCutoff.ts` (the enforcer), and the
+`/pq/agent/:r/:id/{enforce,rotation}/selftest` endpoints, live in the Vértice
+agent gateway. That repository is **private** — it is a production service, not a
+reference — and it is *an* implementation of this profile rather than the
+definition of it. Conformance is decided by the suite above, which anyone can run.
 
 ## Acknowledgements
 
