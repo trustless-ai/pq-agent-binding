@@ -82,6 +82,16 @@ witnessed. **Deriving is strictly stronger than committing here.**
 For a binding `B` of agent `A` at `key_epoch n`, with leaf
 `cc = sha256(JCS(statement))`:
 
+> **Superseded — §10 is the normative construction.** R1–R3 below are the first-draft
+> ordering rules, derived from anchor position and `key_epoch`. They are **superseded by
+> the Settled construction in §10**, which derives ordering from the committed acceptance
+> sequence instead of a `key_epoch` input. They are retained here as the derivation that
+> led to §10 — the defect each addressed, and why anchor position alone was insufficient —
+> not as free-standing normative rules. R4–R6 carry forward into §10: R6 batch-completeness
+> becomes manifest coverage against the anchored admission head, R5 independence is the
+> whole construction's premise, R4 resolution is unchanged. **A conforming verifier
+> implements §10; it does not implement R1–R3 as stated here.**
+
 **R1 — baseline.** For `n = 0`, `governs_from(B) = 0`.
 
 > The baseline key is the agent's key from creation. There is no honest moment
@@ -405,6 +415,44 @@ tamper-evident from the genesis manifest onward.
 A binding is governed by this construction if it has an acceptance record, and by the
 frozen legacy set otherwise. Decidable from committed data, with no third state.
 
+**Scope of the derivation claim.** "Ordering is derived, never trusted as a stored number"
+is a statement about the **post-cutover** construction — bindings admitted through the
+acceptance sequence, whose position *is* their order. It does **not** extend to
+`legacy_bindings_root`. The inherited `key_epoch` values frozen there are **inherited state,
+committed once at genesis, not independently derived**: a verifier takes them as given at the
+migration boundary and can prove only that they have not changed since — never that they were
+themselves produced by a witnessed sequence. Post-cutover ordering is *derived*; legacy
+ordering is *frozen inheritance*. They are different kinds of fact, and the spec must not let
+the stronger claim be read over the older set. Caught by [@pipavlo82](https://github.com/pipavlo82).
+
+### 10.2.1 Resolving `governs_from` — earliest is proven, never merely visible
+
+`governs_from` is the anchor time of the **earliest** manifest whose `entries_root` contains
+the binding. "Earliest" is meaningful only against a complete, reconstructible manifest chain:
+a Merkle inclusion proof establishes that a root *contains* an entry, never that no *earlier*
+root did. Two rules make "earliest" fail-closed rather than best-effort, mirroring the
+discipline §10.4.1 applies to the acceptance chain:
+
+> **Reconstruction is required.** A verifier MUST reconstruct the manifest chain from genesis
+> (`prev_manifest_cc = null`) through the candidate earliest-containing manifest, fetching each
+> `prev_manifest_cc` and recomputing `sha256(JCS(manifest))` to equal the referenced cc. If any
+> manifest required to close that chain cannot be fetched and recomputed, `governs_from` is
+> **`UNRESOLVED` / `UNVERIFIABLE`**. A verifier MUST NOT substitute the earliest *visible*
+> manifest for the earliest *actual* one — "we cannot see an earlier one" is not "there is none".
+
+> **Canonical history.** Two anchored manifests sharing a `prev_manifest_cc` — both claiming the
+> same successor position in the chain — are a manifest-layer fork. Either the anchor layer makes
+> this impossible (a single canonical successor per `prev_manifest_cc`, enforced where manifests
+> are anchored), or a verifier that observes both MUST surface **conflict / `UNRESOLVED`** for any
+> `governs_from` whose earliest determination depends on the forked segment — never silently pick a
+> branch.
+
+Same instinct as §10.4.1 one layer up: the chain relation is fetched and recomputed, an
+unrecoverable link is `UNRESOLVED` and never assumed, and a fork is a surfaced contradiction
+rather than a silent choice. The acceptance chain orders *admissions*; the manifest chain orders
+*coverage*, and "earliest containing manifest" is only as sound as the manifest history is
+complete. Raised by [@pipavlo82](https://github.com/pipavlo82).
+
 ### 10.3 Admission-head cadence — a deadline inherited from a witnessed head
 
 Per-batch-only couples observability to batching: an admitted binding can stay
@@ -548,6 +596,8 @@ case must assert the **stronger** label:
 | `admission-conflict-committed-position` | head closes `s` to a different `acceptance_cc` |
 | `fork-on-prev-collapses-to-equivocation` | the seq constraint forces the two shapes together |
 | `unresolvable-predecessor-is-not-satisfied` | chain relation `UNRESOLVED` when the predecessor cannot be recomputed |
+| `governs-from-unresolved-when-manifest-chain-incomplete` | a required `prev_manifest_cc` cannot be recomputed → `governs_from` is `UNRESOLVED`, never earliest-*visible* (§10.2.1) |
+| `manifest-fork-shared-prev-surfaces-conflict` | two anchored manifests share a `prev_manifest_cc` → conflict/`UNRESOLVED`, never a silent branch pick (§10.2.1) |
 | `equivocation-and-overdue-report-together` | orthogonal classes both reported; neither suppresses the other |
 | `naked-cc-signature-rejected` | an ack over an untyped preimage does not verify |
 
